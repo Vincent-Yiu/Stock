@@ -8,6 +8,7 @@ from tool import Ui_Dialog
 import sys,threading,time
 import csv
 import time
+import configparser
 
 class Stock(object):
     all_stocks=[]
@@ -16,14 +17,28 @@ class Stock(object):
         r=requests.get("http://hq.sinajs.cn/list="+code)
         a=re.findall(r'.*"(.*?)"', r.text)
         data=a[0].split(',')
-        self.name = data[0]
-        self.open = data[1]
-        self.close = data[2]
-        self.price = data[3]
-        self.high = data[4]
-        self.low = data[5]
-        self.date = data[30]
-        self.time = data[31]
+        info={"name":data[0],
+              "open":data[1],
+              "close":data[2],
+              "price":data[3],
+              "high":data[4],
+              "low":data[5],
+              "date":data[30],
+              "time":data[31]
+              }
+        return info
+        # self.open = data[1]
+        # self.close = data[2]
+        # self.price = data[3]
+        # self.high = data[4]
+        # self.low = data[5]
+        # self.date = data[30]
+        # self.time = data[31]
+
+    def load_config_code(self):
+        config=configparser.ConfigParser()
+        config.read("config.ini")
+        return [config.get("stock","code").split(","),config.get("stock","cost").split(",")]
 
     def download_stock(self):
         self.count = 1
@@ -118,19 +133,25 @@ class mainwindow(Ui_MainWindow,QtWidgets.QMainWindow):
         self.setupUi(self)
         self.pushButton.clicked.connect(self.createmonitor)
 
-        self.th=threading.Thread(target=self.update)
+        self.th=threading.Thread(target=self.realtime)
         self.th.setDaemon('True')
         self.th.start()
 
 
-    def update(self):
+    def realtime(self):
         while(1) :
-            self.stock.GetStockInfo("sh600313")
-            self.label_1.setText(self.stock.price)
-            # self.label_2.setText(time.strftime('%H:%M:%S',time.localtime(time.time()))
-            self.stock.GetStockInfo("sh601600")
+            str=""
+            codes,costs=self.stock.load_config_code()
+            for code,cost in zip(codes,costs):
+                info=self.stock.GetStockInfo(code)
+                #涨幅
+                changepercent=(float(info["price"])-float(info["close"]))/float(info["close"])*100
+                #收益百分比
+                profitpercent=(float(info["price"])-float(cost))/float(cost)*100
+                str=str+info["name"][0]+"\t%.2f"%float(info["price"])+"\t%.2f%%\t"%changepercent+"%.2f%%"%profitpercent+'\n'
 
-            self.label_2.setText(self.stock.price)
+            self.label_1.setText(str)
+            self.label_1.adjustSize()
 
     def createmonitor(self):
         data=self.textEdit.toPlainText().split(',')
@@ -144,16 +165,19 @@ class monitorwindow(Ui_Dialog,QtWidgets.QDialog):
         super(monitorwindow,self).__init__()
         self.setupUi(self)
 
-# app = QtWidgets.QApplication(sys.argv)
-# ui = mainwindow()
-# ui.show()
-# sys.exit(app.exec_())
-a=Stock()
-a.save_all_stock()
+app = QtWidgets.QApplication(sys.argv)
+ui = mainwindow()
+ui.show()
+sys.exit(app.exec_())
+
+# a=Stock()
+# a.save_all_stock()
 # a.select_T(4.5)
+
 # current_time=time.strftime('%H:%M:%S',time.localtime(time.time()))
 # print('9:30:00'<current_time<'11:30:00' or '13:00:00'<current_time<'15:00:00' )
 # count=1
+
 # para_val = '[["hq","hs_a","",0,' + str(300) + ',20]]'
 # r_params = {'__s': para_val}
 # # all_quotes_url = 'http://money.finance.sina.com.cn/d/api/openapi_proxy.php/?__s=[["hq","hs_a","",0,88,40]]'
@@ -161,5 +185,8 @@ a.save_all_stock()
 # r = requests.get(all_quotes_url,params=r_params)  #根据网址下载所有的股票编号，这里使用的是新浪网址，有很多网址可以下载股票编号
 # print(len(r.json()[0]["items"]))
 
-# import time
-# print (str(time.strftime("%Y%m%d ", time.localtime())))
+# Config=configparser.ConfigParser()
+# Config.read("config.ini")
+# data=Config.get("config","platformname")
+# print(data.split(','))
+
