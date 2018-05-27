@@ -47,7 +47,9 @@ class Stock(object):
         self.r_params = {'__s': self.para_val}
         self.all_quotes_url = 'http://money.finance.sina.com.cn/d/api/openapi_proxy.php/'
         self.r = requests.get(self.all_quotes_url, params=self.r_params)
-        self.all_stocks.append(self.r.json()[0]['fields'])
+        # self.all_stocks.append(self.r.json()[0]['fields'])
+        field=self.r.json()[0]['fields']
+
         while (True):
             self.para_val = '[["hq","hs_a","",0,' + str(self.count) + ',500]]'  # count 页码 500 条目
             self.r_params = {'__s': self.para_val}
@@ -56,9 +58,12 @@ class Stock(object):
             if len(self.r.json()[0]["items"]) == 0:
                 break
             for item in self.r.json()[0]["items"]:
-                if item['open']!='0':
-                    self.all_stocks.append(item)
+                temp=dict(zip(field,item))
+                if float(temp["open"])!=0:
+                    self.all_stocks.append(temp)
+
             self.count += 1
+        print(self.all_stocks[0].keys())
 
     def save_all_stock(self):
         filename = 'data/' + time.strftime("%Y%m%d", time.localtime()) + '.csv'
@@ -66,7 +71,8 @@ class Stock(object):
             self.download_stock()
             print('None')
         with open(filename, 'w') as f:
-            writer = csv.writer(f)
+            writer = csv.DictWriter(f,fieldnames=self.all_stocks[0].keys())
+            writer.writeheader()
             for row in self.all_stocks:
                 writer.writerow(row)
 
@@ -165,13 +171,13 @@ class monitorwindow(Ui_Dialog,QtWidgets.QDialog):
         super(monitorwindow,self).__init__()
         self.setupUi(self)
 
-app = QtWidgets.QApplication(sys.argv)
-ui = mainwindow()
-ui.show()
-sys.exit(app.exec_())
+# app = QtWidgets.QApplication(sys.argv)
+# ui = mainwindow()
+# ui.show()
+# sys.exit(app.exec_())
 
-# a=Stock()
-# a.save_all_stock()
+a=Stock()
+a.save_all_stock()
 # a.select_T(4.5)
 
 # current_time=time.strftime('%H:%M:%S',time.localtime(time.time()))
