@@ -12,6 +12,11 @@ import configparser
 
 class Stock(object):
     all_stocks=[]
+    def __init__(self):
+        config=configparser.ConfigParser()
+        config.read("config.ini")
+        self.save_path=config.get("path","save_path")
+        self.select_path=config.get("path","select_path")
 
     def GetStockInfo(self,code):
         r=requests.get("http://hq.sinajs.cn/list="+code)
@@ -49,24 +54,24 @@ class Stock(object):
         self.r = requests.get(self.all_quotes_url, params=self.r_params)
         # self.all_stocks.append(self.r.json()[0]['fields'])
         field=self.r.json()[0]['fields']
+        try:
+            while (True):
+                self.para_val = '[["hq","hs_a","",0,' + str(self.count) + ',500]]'  # count 页码 500 条目
+                self.r_params = {'__s': self.para_val}
+                self.all_quotes_url = 'http://money.finance.sina.com.cn/d/api/openapi_proxy.php/'
+                self.r = requests.get(self.all_quotes_url, params=self.r_params)  # 根据网址下载所有的股票编号，这里使用的是新浪网址，有很多网址可以下载股票编号
+                if len(self.r.json()[0]["items"]) == 0:
+                    break
+                for item in self.r.json()[0]["items"]:
+                    temp=dict(zip(field,item))
+                    if float(temp["open"])!=0:
+                        self.all_stocks.append(temp)
 
-        while (True):
-            self.para_val = '[["hq","hs_a","",0,' + str(self.count) + ',500]]'  # count 页码 500 条目
-            self.r_params = {'__s': self.para_val}
-            self.all_quotes_url = 'http://money.finance.sina.com.cn/d/api/openapi_proxy.php/'
-            self.r = requests.get(self.all_quotes_url, params=self.r_params)  # 根据网址下载所有的股票编号，这里使用的是新浪网址，有很多网址可以下载股票编号
-            if len(self.r.json()[0]["items"]) == 0:
-                break
-            for item in self.r.json()[0]["items"]:
-                temp=dict(zip(field,item))
-                if float(temp["open"])!=0:
-                    self.all_stocks.append(temp)
-
-            self.count += 1
-        print(self.all_stocks[0].keys())
-
+                self.count += 1
+        except:
+            print("error")
     def save_all_stock(self):
-        filename = 'data/' + time.strftime("%Y%m%d", time.localtime()) + '.csv'
+        filename = self.save_path +'/'+ time.strftime("%Y%m%d", time.localtime()) + '.csv'
         if len(self.all_stocks)==0:
             self.download_stock()
             print('None')
@@ -96,20 +101,20 @@ class Stock(object):
         #         self.reader=csv.DictReader(f)
         #         self.all_stocks=[row for row in self.reader]
 
-    def save_select(self,filename,data):
-        with open(filename,'w') as f:
-            for item in data:
-                f.write('%s\t%s\n'%(item[0],item[1]))
+    # def save_select(self,filename,data):
+    #     with open(filename,'w') as f:
+    #         for item in data:
+    #             f.write('%s\t%s\n'%(item[0],item[1]))
 
 
     def select_changepercent(self,percent):
-        self.load_all_stock()
+        self.download_stock()
         for stock in self.all_stocks:
             if float(stock['changepercent'])>percent:
                 print(stock['symbol'])
 
     def select_T(self,percent):
-        self.load_all_stock()
+        self.download_stock()
         self.data=[]
         for stock in self.all_stocks:
             if (float(stock['open']) != 0):
@@ -121,11 +126,10 @@ class Stock(object):
                     and float(stock['trade'])<100:
                     # and float(stock['trade']) >= float(stock['open'])\
                     if self.price_open>=-2.50:
-                        print(stock['symbol']+'\t%.3f'%self.price_open)
                         self.data.append([stock['symbol'],'%.3f'%self.price_open])
                     # print(stock['symbol'])
         #save
-        self.filename=filename='selection/'+time.strftime("%Y%m%d", time.localtime())+'-'+str(percent)+'.txt'
+        filename=self.select_path+'/'+time.strftime("%Y%m%d", time.localtime())+'-'+str(percent)+'.txt'
         with open(filename,'w')as f:
             for item in self.data:
                 f.write('%s\t%s\n'%(item[0],item[1]))
@@ -133,17 +137,30 @@ class Stock(object):
 
 class mainwindow(Ui_MainWindow,QtWidgets.QMainWindow):
     stock=Stock()
-    second=1
+    top=False
     def __init__(self, parent=None):
         super(mainwindow, self).__init__()
         self.setupUi(self)
-        self.pushButton.clicked.connect(self.createmonitor)
+        # self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
+        self.show()
+        # self.pushButton.clicked.connect(self.createmonitor)
+        self.pushButton_save.clicked.connect(lambda:self.stock.save_all_stock())
+        self.pushButton_select_T.clicked.connect(lambda:self.stock.select_T(4.5))
+        self.pushButton_top.clicked.connect(self.top)
+
 
         self.th=threading.Thread(target=self.realtime)
         self.th.setDaemon('True')
         self.th.start()
-
-
+    def top(self):
+        self.hide()
+        if(self.top==False):
+            self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
+            self.top=True
+        else:
+            self.setWindowFlags(QtCore.Qt.Widget)
+            self.top=False
+        self.show()
     def realtime(self):
         while(1) :
             str=""
@@ -171,13 +188,15 @@ class monitorwindow(Ui_Dialog,QtWidgets.QDialog):
         super(monitorwindow,self).__init__()
         self.setupUi(self)
 
-# app = QtWidgets.QApplication(sys.argv)
-# ui = mainwindow()
+app = QtWidgets.QApplication(sys.argv)
+ui = mainwindow()
+# ui.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
+# ui.setWindowFlags(QtCore.Qt.Widget)
 # ui.show()
-# sys.exit(app.exec_())
+sys.exit(app.exec_())
 
 a=Stock()
-a.save_all_stock()
+# a.save_all_stock()
 # a.select_T(4.5)
 
 # current_time=time.strftime('%H:%M:%S',time.localtime(time.time()))
