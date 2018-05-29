@@ -9,6 +9,7 @@ import sys,threading,time
 import csv
 import time
 import configparser
+from PyQt5.QtWidgets import QMessageBox
 
 class Stock(object):
     all_stocks=[]
@@ -32,13 +33,7 @@ class Stock(object):
               "time":data[31]
               }
         return info
-        # self.open = data[1]
-        # self.close = data[2]
-        # self.price = data[3]
-        # self.high = data[4]
-        # self.low = data[5]
-        # self.date = data[30]
-        # self.time = data[31]
+
 
     def load_config_code(self):
         config=configparser.ConfigParser()
@@ -81,53 +76,34 @@ class Stock(object):
             for row in self.all_stocks:
                 writer.writerow(row)
 
-    def load_all_stock(self):
-        pass
 
-        # try:
-        #     with open(filename) as f:
-        #         self.reader=csv.DictReader(f)
-        #         self.all_stocks=[row for row in self.reader]
-        #
-        # except:
-        #     print("no file")
-        #     self.download_stock()
-        #     with open(filename, 'w') as f:
-        #         writer = csv.writer(f)
-        #         for row in self.all_stocks:
-        #             writer.writerow(row)
-        #
-        #     with open(filename) as f:
-        #         self.reader=csv.DictReader(f)
-        #         self.all_stocks=[row for row in self.reader]
-
-    # def save_select(self,filename,data):
-    #     with open(filename,'w') as f:
-    #         for item in data:
-    #             f.write('%s\t%s\n'%(item[0],item[1]))
 
 
     def select_changepercent(self,percent):
         self.download_stock()
+        data = []
         for stock in self.all_stocks:
             if float(stock['changepercent'])>percent:
-                print(stock['symbol'])
+                data.append(stock['symbol'])
+
+        filename = self.select_path + '/' + 'change'+time.strftime("%Y%m%d", time.localtime()) + '-' + str(percent) + '.txt'
+        with open(filename, 'w')as f:
+            for item in data:
+                f.write('%s\n' % item)
 
     def select_T(self,percent):
         self.download_stock()
         self.data=[]
         for stock in self.all_stocks:
-            if (float(stock['open']) != 0):
-                self.price_open=(float(stock['trade']) - float(stock['open']))/float(stock['open'])*100
+            self.price_open=(float(stock['trade']) - float(stock['open']))/float(stock['open'])*100
 
-                if (float(stock['trade'])>float(stock['low'])*(1+(percent/100))) \
-                    and (float(stock['open'])>float(stock['low'])*(1+(percent/100))) \
-                    and float(stock['changepercent'])<9.9 \
-                    and float(stock['trade'])<100:
-                    # and float(stock['trade']) >= float(stock['open'])\
-                    if self.price_open>=-2.50:
-                        self.data.append([stock['symbol'],'%.3f'%self.price_open])
-                    # print(stock['symbol'])
+            if (float(stock['trade'])>float(stock['low'])*(1+(percent/100))) \
+                and (float(stock['open'])>float(stock['low'])*(1+(percent/100))) \
+                and float(stock['changepercent'])<9.9 \
+                and float(stock['trade'])<100:
+                # and float(stock['trade']) >= float(stock['open'])\
+                if self.price_open>=-2.50:
+                    self.data.append([stock['symbol'],'%.3f'%self.price_open])
         #save
         filename=self.select_path+'/'+time.strftime("%Y%m%d", time.localtime())+'-'+str(percent)+'.txt'
         with open(filename,'w')as f:
@@ -141,25 +117,43 @@ class mainwindow(Ui_MainWindow,QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         super(mainwindow, self).__init__()
         self.setupUi(self)
-        # self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
         self.show()
         # self.pushButton.clicked.connect(self.createmonitor)
-        self.pushButton_save.clicked.connect(lambda:self.stock.save_all_stock())
-        self.pushButton_select_T.clicked.connect(lambda:self.stock.select_T(4.5))
-        self.pushButton_top.clicked.connect(self.top)
+        self.pushButton_save_all.clicked.connect(self.save_all)
+        self.pushButton_save_percent.clicked.connect(lambda:self.save_percent(float(self.lineEdit.text())))
+        self.pushButton_select_T.clicked.connect(lambda:self.select(float(self.lineEdit.text())))
+        # self.pushButton_top.clicked.connect(self.top)
 
 
         self.th=threading.Thread(target=self.realtime)
         self.th.setDaemon('True')
         self.th.start()
+
+    def select(self,percent):
+        self.stock.select_T(percent)
+        self.msg()
+    def save_all(self):
+        self.stock.save_all_stock()
+        self.msg()
+    def save_percent(self,percent):
+        self.stock.select_changepercent(percent)
+        self.msg()
+
+    def msg(self):
+        reply = QMessageBox.information(self,  # 使用infomation信息框
+                                        "标题",
+                                        "保存成功")
+
     def top(self):
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
         self.hide()
-        if(self.top==False):
-            self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
-            self.top=True
-        else:
-            self.setWindowFlags(QtCore.Qt.Widget)
-            self.top=False
+        # if(self.top==False):
+        # self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
+        #     self.top=True
+        # else:
+        #     self.setWindowFlags(QtCore.Qt.Widget)
+        #     self.top=False
         self.show()
     def realtime(self):
         while(1) :
@@ -190,9 +184,6 @@ class monitorwindow(Ui_Dialog,QtWidgets.QDialog):
 
 app = QtWidgets.QApplication(sys.argv)
 ui = mainwindow()
-# ui.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
-# ui.setWindowFlags(QtCore.Qt.Widget)
-# ui.show()
 sys.exit(app.exec_())
 
 a=Stock()
